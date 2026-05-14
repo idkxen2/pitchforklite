@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive</title>
+    <link rel="icon" href="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png">
+
+    <style>
+        :root {
+            --bg-color: #000000;
+            --sidebar-bg: #080808;
+            --panel-bg: #0d0d0d;
+            --accent: #ffffff;
+            --accent-hover: #d4d4d4;
+            --text-main: #f0f0f0;
+            --text-muted: #7a7a7a;
+            --border-color: #1c1c1c;
+            --border-hover: #3a3a3a;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --transition-fast: 0.18s ease;
+            --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Thin custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4a4a4a;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.985) translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes subtlePulse {
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ── Fake Error Page ── */
+        #fake-error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #000000;
+            color: #bdc1c6;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            text-align: left;
+            user-select: none;
+        }
+        .error-container {
+            max-width: 580px;
+            padding: 24px;
+            width: 100%;
+        }
+        .error-container h1 {
+            font-size: 22px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+        .error-container p,
+        .error-container li {
+            color: #9aa0a6;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .error-container ul {
+            margin-top: 8px;
+            padding-left: 20px;
+        }
+        .error-code {
+            font-size: 11px !important;
+            margin-top: 28px;
+            text-transform: uppercase;
+            color: #5f6368 !important;
+            letter-spacing: 0.5px;
+        }
+
+        /* ── Main App ── */
+        #app {
+            display: none;
+            height: 100%;
+            width: 100%;
+            flex-direction: row;
+            animation: fadeIn 0.3s ease-out;
+            position: relative;
+            isolation: isolate;
+        }
+
+        /* Snow canvas */
+        #snow-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 210px;
+            flex-shrink: 0;
+            background-color: var(--sidebar-bg);
+            padding: 22px 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            border-right: 1px solid var(--border-color);
+            z-index: 2;
+            overflow-y: auto;
+            position: relative;
+        }
+        .sidebar h2 {
+            margin: 0 0 20px 8px;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            text-align: left;
+            padding: 11px 14px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            letter-spacing: 0.1px;
+            position: relative;
+        }
+        .tab-btn:hover {
+            background: #141414;
+            color: #ccc;
+            transform: translateX(3px);
+        }
+        .tab-btn.active {
+            background: #151515;
+            color: var(--accent);
+            font-weight: 600;
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            transform: translateX(0);
+            letter-spacing: 0.2px;
+        }
+
+        /* ── Content ── */
+        .content {
+            flex: 1;
+            min-width: 0;
+            padding: 28px 32px;
+            overflow-y: auto;
+            position: relative;
+            z-index: 1;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        /* ── Game Grid ── */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+            gap: 20px;
+        }
+        .game-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            height: 175px;
+            transition: all var(--transition-smooth);
+            outline: none;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: #444;
+            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.03);
+        }
+        .game-card:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px;
+        }
+        .game-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.35s;
+            opacity: 0.8;
+        }
+        .game-card:hover img {
+            opacity: 0.95;
+        }
+        .game-card .title {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 100%);
+            padding: 28px 12px 10px 12px;
+            text-align: center;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+            word-wrap: break-word;
+            letter-spacing: 0.2px;
+        }
+
+        /* ── Game Player ── */
+        #game-player {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            animation: fadeInScale 0.3s ease forwards;
+            position: relative;
+            z-index: 1;
+        }
+        .player-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .control-btn {
+            background: var(--panel-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 9px 18px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 13px;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .control-btn.primary {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+        .control-btn:hover {
+            background: #1f1f1f;
+            border-color: #444;
+        }
+        .control-btn.primary:hover {
+            background: #d9d9d9;
+            border-color: #d9d9d9;
+        }
+        .control-btn:active {
+            transform: scale(0.97);
+        }
+        iframe {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: #111;
+            width: 100%;
+            min-height: 0;
+        }
+        iframe:-webkit-full-screen {
+            border: none;
+            border-radius: 0;
+            background: #000;
+        }
+        iframe:-moz-full-screen {
+            border: none;
+            border-radius: 0;
+            background: #000;
+        }
+        iframe:-ms-fullscreen {
+            border: none;
+            border-radius: 0;
+            background: #000;
+        }
+        iframe:fullscreen {
+            border: none;
+            border-radius: 0;
+            background: #000;
+        }
+
+        /* ── Panels ── */
+        .panel {
+            background: var(--panel-bg);
+            padding: 22px 24px;
+            border-radius: var(--radius-lg);
+            max-width: 750px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+        .panel h3 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            letter-spacing: -0.2px;
+        }
+        .panel p {
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 0 0 4px 0;
+        }
+        .action-btn {
+            background: #0a0a0a;
+            color: #ddd;
+            padding: 10px 20px;
+            border: 1px solid #2a2a2a;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            margin-right: 8px;
+            margin-top: 12px;
+            transition: all var(--transition-fast);
+            letter-spacing: 0.1px;
+        }
+        .action-btn:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+        .action-btn:active {
+            transform: scale(0.96);
+        }
+        .download-btn {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            font-size: 12.5px;
+            padding: 9px 15px;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            letter-spacing: 0.1px;
+        }
+        .download-btn:hover {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+        .download-btn:active {
+            transform: scale(0.96);
+        }
+        input[type="file"] {
+            margin-top: 16px;
+            display: block;
+            color: var(--text-main);
+            background: #0a0a0a;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid #222;
+            width: 100%;
+            cursor: pointer;
+            font-size: 13px;
+            transition: border-color var(--transition-fast);
+        }
+        input[type="file"]:hover {
+            border-color: #444;
+        }
+        .download-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+            #app {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                flex-direction: row;
+                overflow-x: auto;
+                padding: 12px 10px;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                gap: 2px;
+            }
+            .sidebar h2 {
+                display: none;
+            }
+            .tab-btn {
+                white-space: nowrap;
+                padding: 9px 13px;
+                font-size: 12px;
+                border-radius: var(--radius-sm);
+            }
+            .tab-btn.active {
+                border-left: none;
+                border-bottom: 2px solid var(--accent);
+                border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            }
+            .tab-btn:hover {
+                transform: translateX(0) translateY(-1px);
+            }
+            .content {
+                padding: 16px;
+            }
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 14px;
+            }
+            .game-card {
+                height: 145px;
+            }
+            .game-card .title {
+                font-size: 12px;
+            }
+            .panel {
+                padding: 16px 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fake Error Page -->
+    <div id="fake-error">
+        <div class="error-container">
+            <svg viewBox="0 0 24 24" width="44" height="44" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:#9aa0a6; margin-bottom: 18px;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <h1>No internet</h1>
+            <p>Try:</p>
+            <ul>
+                <li>Checking the network cables, modem, and router</li>
+                <li>Reconnecting to Wi-Fi</li>
+            </ul>
+            <p class="error-code">ERR_INTERNET_DISCONNECTED</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <!-- Snow particle canvas -->
+        <canvas id="snow-canvas" aria-hidden="true"></canvas>
+
+        <div class="sidebar">
+            <h2>Pitchfork</h2>
+            <button class="tab-btn active" data-tab="games">Game Library</button>
+            <button class="tab-btn" data-tab="upload">Offline Files</button>
+            <button class="tab-btn" data-tab="settings">Cloak Settings</button>
+        </div>
+
+        <div class="content">
+            <!-- Games Tab -->
+            <div id="games-tab" class="tab-content active">
+                <div class="grid" id="games-grid"></div>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="upload-tab" class="tab-content">
+                <div class="panel">
+                    <h3>Upload Custom Game</h3>
+                    <p>Play any HTML game file directly from your computer. Processed instantly and locally.</p>
+                    <input type="file" id="game-upload" accept=".html,.htm" onchange="handleFileUpload(event)">
+                </div>
+                <div class="panel">
+                    <h3>Download Offline HTMLs</h3>
+                    <p>Save these raw games directly to your device so you can play them without Pitchfork or internet.</p>
+                    <div class="download-grid" id="download-grid"></div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <div class="panel">
+                    <h3>Tab Cloaking</h3>
+                    <p>Launch Pitchfork Lite into an untraceable, history-free environment using browser exploits.</p>
+                    <button class="action-btn" onclick="openAboutBlank()">Launch in about:blank</button>
+                    <button class="action-btn" onclick="openBlob()">Launch in blob url</button>
+                </div>
+            </div>
+
+            <!-- Game Player -->
+            <div id="game-player">
+                <div class="player-controls">
+                    <button class="control-btn" onclick="closeGame()">
+                        <span>←</span> Back to Library
+                    </button>
+                    <button class="control-btn primary" onclick="fullscreenGame()">
+                        ⛶ Fullscreen Game
+                    </button>
+                </div>
+                <iframe id="game-frame" srcdoc="" title="Game Player"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ──────────────────────────────────────
+            // STATE
+            // ──────────────────────────────────────
+            let isErrorPage = true;
+            let currentTab = 'games'; // tracks which tab is active
+            let snowAnimationId = null;
+
+            // ──────────────────────────────────────
+            // SNOW / DOTS PARTICLE EFFECT
+            // ──────────────────────────────────────
+            const snowCanvas = document.getElementById('snow-canvas');
+            const snowCtx = snowCanvas.getContext('2d');
+            let particles = [];
+            const PARTICLE_COUNT = 130;
+
+            function resizeSnowCanvas() {
+                const app = document.getElementById('app');
+                if (!app || app.style.display === 'none') return;
+                const rect = app.getBoundingClientRect();
+                const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap for perf
+                snowCanvas.width = rect.width * dpr;
+                snowCanvas.height = rect.height * dpr;
+                snowCanvas.style.width = rect.width + 'px';
+                snowCanvas.style.height = rect.height + 'px';
+                snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+                snowCtx.scale(dpr, dpr);
+            }
+
+            function createParticle(canvasW, canvasH) {
+                return {
+                    x: Math.random() * (canvasW || window.innerWidth),
+                    y: Math.random() * (canvasH || window.innerHeight),
+                    radius: 0.4 + Math.random() * 1.4, // tiny dots 0.4–1.8px
+                    opacity: 0.04 + Math.random() * 0.22, // low opacity
+                    speedY: 0.15 + Math.random() * 0.55, // slow fall
+                    speedX: (Math.random() - 0.5) * 0.35, // slight drift
+                    wobbleAmp: 0.1 + Math.random() * 0.5,
+                    wobbleSpeed: 0.003 + Math.random() * 0.012,
+                    wobbleOffset: Math.random() * Math.PI * 2,
+                };
+            }
+
+            function initParticles() {
+                const w = snowCanvas.width / (Math.min(window.devicePixelRatio || 1, 2));
+                const h = snowCanvas.height / (Math.min(window.devicePixelRatio || 1, 2));
+                particles = [];
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    particles.push(createParticle(w || window.innerWidth, h || window.innerHeight));
+                }
+            }
+
+            function animateSnow(timestamp) {
+                const app = document.getElementById('app');
+                if (!app || app.style.display === 'none' || document.hidden) {
+                    snowAnimationId = requestAnimationFrame(animateSnow);
+                    return;
+                }
+
+                const displayW = snowCanvas.width / (Math.min(window.devicePixelRatio || 1, 2));
+                const displayH = snowCanvas.height / (Math.min(window.devicePixelRatio || 1, 2));
+
+                if (displayW <= 0 || displayH <= 0) {
+                    snowAnimationId = requestAnimationFrame(animateSnow);
+                    return;
+                }
+
+                snowCtx.clearRect(0, 0, displayW, displayH);
+
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+
+                    // Update position
+                    p.y += p.speedY;
+                    p.x += p.speedX + Math.sin(timestamp * p.wobbleSpeed + p.wobbleOffset) * p.wobbleAmp;
+
+                    // Wrap around
+                    if (p.y > displayH + 5) {
+                        p.y = -5;
+                        p.x = Math.random() * displayW;
+                    }
+                    if (p.x > displayW + 10) p.x = -10;
+                    if (p.x < -10) p.x = displayW + 10;
+
+                    // Draw tiny dot
+                    snowCtx.beginPath();
+                    snowCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    snowCtx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                    snowCtx.fill();
+                }
+
+                snowAnimationId = requestAnimationFrame(animateSnow);
+            }
+
+            function startSnow() {
+                resizeSnowCanvas();
+                initParticles();
+                if (snowAnimationId) cancelAnimationFrame(snowAnimationId);
+                snowAnimationId = requestAnimationFrame(animateSnow);
+            }
+
+            function stopSnow() {
+                if (snowAnimationId) {
+                    cancelAnimationFrame(snowAnimationId);
+                    snowAnimationId = null;
+                }
+            }
+
+            // ──────────────────────────────────────
+            // ERROR PAGE TOGGLE
+            // ──────────────────────────────────────
+            function toggleErrorPage(forceError = null) {
+                if (forceError !== null) {
+                    isErrorPage = forceError;
+                } else {
+                    isErrorPage = !isErrorPage;
+                }
+
+                const fakeError = document.getElementById('fake-error');
+                const app = document.getElementById('app');
+
+                if (isErrorPage) {
+                    fakeError.style.display = 'flex';
+                    app.style.display = 'none';
+                    stopSnow();
+                } else {
+                    fakeError.style.display = 'none';
+                    app.style.display = 'flex';
+                    // Delay snow start slightly so layout is computed
+                    requestAnimationFrame(() => {
+                        startSnow();
+                    });
+                }
+            }
+
+            // Keyboard shortcut: Ctrl+Shift+S or Ctrl+Shift+!
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.shiftKey && (e.key.toLowerCase() === 's' || e.key === '!' || e.key ===
+                        '1')) {
+                    e.preventDefault();
+                    toggleErrorPage();
+                }
+            });
+
+            // Auto-revert to error page when tab loses focus
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && !isErrorPage) {
+                    toggleErrorPage(true);
+                }
+            });
+
+            // Handle window resize for snow canvas
+            window.addEventListener('resize', () => {
+                if (!isErrorPage) {
+                    resizeSnowCanvas();
+                    initParticles();
+                }
+            });
+
+            // ──────────────────────────────────────
+            // TAB NAVIGATION (fixed: no reliance on global event)
+            // ──────────────────────────────────────
+            function switchTab(tabId) {
+                closeGame();
+                currentTab = tabId;
+
+                // Clear all tab contents
+                document.querySelectorAll('.tab-content').forEach(el => {
+                    el.classList.remove('active');
+                    el.style.display = ''; // clear any inline display overrides
+                });
+
+                // Clear all tab buttons
+                document.querySelectorAll('.tab-btn').forEach(el => {
+                    el.classList.remove('active');
+                });
+
+                // Activate target tab content
+                const targetContent = document.getElementById(tabId + '-tab');
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+
+                // Activate corresponding button (match by data-tab attribute)
+                const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+                if (targetBtn) {
+                    targetBtn.classList.add('active');
+                }
+            }
+
+            // Attach click handlers to tab buttons (more robust than inline onclick)
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    if (tabId) switchTab(tabId);
+                });
+            });
+
+            // ──────────────────────────────────────
+            // GAME LIBRARY DATA
+            // ──────────────────────────────────────
+            const games = [
+                { name: "Baldi's Basics",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/baldisbasics.html",
+                    icon: "https://play-lh.googleusercontent.com/EPV1TB4So1lB0DGrdCVExDpNU8ML67nd8OqBeoOIM-s6sDicxmDdPvCXD6n7LKevFl0" },
+                { name: "Ragdoll Archers",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/ragdollarchers.htm",
+                    icon: "https://play-lh.googleusercontent.com/XMiWEMPbuq13oVcwYQ6ySLtZnBf7WpJ3rb7v-TM4MdFOvWfo1Z2hzSEAApRXzEcshjY=w240-h480-rw" },
+                { name: "Super Mario 64",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/sm64.html",
+                    icon: "https://m.media-amazon.com/images/M/MV5BY2QzZTVhYjctZWMyNy00MDlhLThhYTktZDg2M2EwNTE3ZDZkXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg" },
+                { name: "Zombie Rush",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/zombierush.html",
+                    icon: "https://play-lh.googleusercontent.com/ikzqfWg_tsfdzXNPbCKdNSDqEvNeryzCFi1rGArx6A_YYzyjJzeWXplY6cVgPX0xb18" },
+                { name: "Age of War",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/ageofwar.html",
+                    icon: "https://play-lh.googleusercontent.com/cez7h97liCyy1oqCsBRy0tzIbdRXDFjGs6XuAyPCbl2PHglm_wl8KydulnJWjMlRgGPc" },
+                { name: "Basket Random",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/basketrandom.html",
+                    icon: "https://play-lh.googleusercontent.com/gP8T5Z1O-ngxIloiwcBZzrzyLPYDp0R_1BDNKUDZboIRPVImeyWI8-7aExvB9gAGNKc" },
+                { name: "Crazy Motorcycle",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/crazymotorcycle.html",
+                    icon: "https://imgs.crazygames.com/crazy-motorcycle_16x9/20250711063030/crazy-motorcycle_16x9-cover?metadata=none&quality=100&width=1200&height=630&fit=crop" },
+                { name: "Geometry Dash Lite",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/geometrydashlite.html",
+                    icon: "https://play-lh.googleusercontent.com/p7kWbWBFxQIrzolEqiV5uSvctLeyssZvBV7UBOX29wzZI52IdcSs4qCB_zsQJL1mt9A" },
+                { name: "Granny",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/granny.html",
+                    icon: "https://play-lh.googleusercontent.com/yT_LBq_tyKeIDohKDsqN_Qt18jGIPUYIxY2C-1-E2YA9Qd60uZW08pua17qBmIiDPA=w240-h480-rw" },
+                { name: "Retro Bowl",
+                    url: "https://github.com/CoolDude2349/Offline-HTML-Games-Pack/raw/refs/heads/master/offline/retrobowl.html",
+                    icon: "https://play-lh.googleusercontent.com/WRM5Y1xZmzcCP1YtO5zl6G2g7CU5c5ZfjX4UVrgi1bpNgkfy-wuB-bQx3kkeRfaGYQ=w240-h480-rw" },
+            ];
+
+            // ──────────────────────────────────────
+            // RENDER GAME GRID & DOWNLOAD BUTTONS
+            // ──────────────────────────────────────
+            const grid = document.getElementById('games-grid');
+            const downloadGrid = document.getElementById('download-grid');
+
+            games.forEach(game => {
+                // Game card
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.setAttribute('tabindex', '0');
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', `Play ${game.name}`);
+                card.addEventListener('click', () => fetchAndPlayGame(game.url));
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        fetchAndPlayGame(game.url);
+                    }
+                });
+                card.innerHTML = `
+                    <img src="${game.icon}" alt="${game.name}" loading="lazy">
+                    <div class="title">${game.name}</div>
+                `;
+                grid.appendChild(card);
+
+                // Download button
+                const dlBtn = document.createElement('button');
+                dlBtn.className = 'download-btn';
+                dlBtn.innerHTML = `⬇ ${game.name}`;
+                dlBtn.addEventListener('click', () => downloadGameHtml(game.url, game.name, dlBtn));
+                downloadGrid.appendChild(dlBtn);
+            });
+
+            // ──────────────────────────────────────
+            // URL HELPERS
+            // ──────────────────────────────────────
+            function getRawUrl(githubUrl) {
+                return githubUrl
+                    .replace('github.com', 'raw.githubusercontent.com')
+                    .replace('/raw/refs/heads/', '/refs/heads/')
+                    .replace('/raw/', '/');
+            }
+
+            // ──────────────────────────────────────
+            // FETCH & PLAY GAME
+            // ──────────────────────────────────────
+            async function fetchAndPlayGame(githubUrl) {
+                // Hide all tab contents dynamically
+                document.querySelectorAll('.tab-content').forEach(el => {
+                    el.style.display = 'none';
+                });
+
+                const player = document.getElementById('game-player');
+                const iframe = document.getElementById('game-frame');
+                player.style.display = 'flex';
+
+                // Loading screen
+                iframe.srcdoc = `
+                    <body style="background:#000;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;text-align:center;margin:0;padding-top:30vh;height:100vh;box-sizing:border-box;">
+                        <h2 style="font-size:22px;font-weight:500;letter-spacing:-0.3px;">Extracting HTML &amp; Loading Game…</h2>
+                        <p style="color:#777;font-size:14px;">Please wait a moment.</p>
+                    </body>
+                `;
+
+                try {
+                    const response = await fetch(getRawUrl(githubUrl));
+                    if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch game`);
+                    const htmlCode = await response.text();
+                    iframe.srcdoc = htmlCode;
+                } catch (err) {
+                    iframe.srcdoc = `
+                        <body style="background:#000;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;text-align:center;margin:0;padding-top:30vh;height:100vh;box-sizing:border-box;">
+                            <h2 style="color:#ff5252;font-size:20px;font-weight:500;">Error Loading Game</h2>
+                            <p style="color:#888;font-size:14px;">${err.message}</p>
+                            <button onclick="window.parent.closeGame()" style="margin-top:20px;padding:10px 22px;background:#fff;color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">← Back to Library</button>
+                        </body>
+                    `;
+                }
+            }
+
+            // ──────────────────────────────────────
+            // CLOSE GAME & RESTORE TAB
+            // ──────────────────────────────────────
+            function closeGame() {
+                const player = document.getElementById('game-player');
+                const iframe = document.getElementById('game-frame');
+
+                // Only act if the game player is visible
+                if (player.style.display === 'none' || player.style.display === '') return;
+
+                player.style.display = 'none';
+                iframe.srcdoc = '';
+
+                // Restore the currently active tab
+                const activeTab = document.getElementById(currentTab + '-tab');
+                if (activeTab) {
+                    activeTab.style.display = 'block';
+                } else {
+                    // Fallback: show all tab contents that have the active class
+                    document.querySelectorAll('.tab-content.active').forEach(el => {
+                        el.style.display = 'block';
+                    });
+                }
+            }
+
+            // ──────────────────────────────────────
+            // FULLSCREEN
+            // ──────────────────────────────────────
+            function fullscreenGame() {
+                const iframe = document.getElementById('game-frame');
+                const fsFn = iframe.requestFullscreen ||
+                    iframe.mozRequestFullScreen ||
+                    iframe.webkitRequestFullscreen ||
+                    iframe.msRequestFullscreen;
+                if (fsFn) {
+                    fsFn.call(iframe).catch(() => {
+                        // Silently fail if fullscreen is denied
+                    });
+                }
+            }
+
+            // ──────────────────────────────────────
+            // DOWNLOAD GAME HTML
+            // ──────────────────────────────────────
+            async function downloadGameHtml(githubUrl, gameName, btnElement) {
+                const originalHTML = btnElement.innerHTML;
+                btnElement.innerHTML = '⏳ Fetching…';
+                btnElement.style.pointerEvents = 'none';
+                btnElement.disabled = true;
+
+                try {
+                    const response = await fetch(getRawUrl(githubUrl));
+                    if (!response.ok) throw new Error('Network error');
+                    const htmlCode = await response.text();
+
+                    const blob = new Blob([htmlCode], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const safeName = gameName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') +
+                        '.html';
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = safeName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    btnElement.innerHTML = '✅ Saved!';
+                    btnElement.style.borderColor = '#fff';
+                    btnElement.style.color = '#fff';
+                } catch (err) {
+                    alert(`Failed to download "${gameName}": ${err.message}`);
+                    btnElement.innerHTML = '❌ Failed';
+                }
+
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHTML;
+                    btnElement.style.pointerEvents = 'auto';
+                    btnElement.disabled = false;
+                    btnElement.style.borderColor = '';
+                    btnElement.style.color = '';
+                }, 2500);
+            }
+
+            // ──────────────────────────────────────
+            // CUSTOM HTML UPLOAD
+            // ──────────────────────────────────────
+            function handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const htmlCode = e.target.result;
+
+                    // Hide all tab contents
+                    document.querySelectorAll('.tab-content').forEach(el => {
+                        el.style.display = 'none';
+                    });
+
+                    const player = document.getElementById('game-player');
+                    const iframe = document.getElementById('game-frame');
+                    player.style.display = 'flex';
+                    iframe.srcdoc = htmlCode;
+                    event.target.value = ''; // reset input
+                };
+                reader.onerror = function() {
+                    alert('Error reading file. Please try again.');
+                };
+                reader.readAsText(file);
+            }
+
+            // ──────────────────────────────────────
+            // CLOAKING SETTINGS
+            // ──────────────────────────────────────
+            function openAboutBlank() {
+                const win = window.open('about:blank', '_blank');
+                if (!win) {
+                    alert('Popup blocked. Please allow popups for this site to use stealth launch.');
+                    return;
+                }
+                win.document.write(document.documentElement.outerHTML);
+                win.document.close();
+            }
+
+            function openBlob() {
+                const html = document.documentElement.outerHTML;
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const win = window.open(url, '_blank');
+                if (!win) {
+                    alert('Popup blocked. Please allow popups for this site to use stealth launch.');
+                }
+                // Clean up blob URL after a short delay
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            }
+
+            // ──────────────────────────────────────
+            // EXPOSE TO GLOBAL SCOPE (for inline onclick fallbacks)
+            // ──────────────────────────────────────
+            window.switchTab = switchTab;
+            window.closeGame = closeGame;
+            window.fullscreenGame = fullscreenGame;
+            window.handleFileUpload = handleFileUpload;
+            window.openAboutBlank = openAboutBlank;
+            window.openBlob = openBlob;
+            window.toggleErrorPage = toggleErrorPage;
+
+            // ──────────────────────────────────────
+            // INITIAL SETUP
+            // ──────────────────────────────────────
+            // Start with error page visible
+            document.getElementById('fake-error').style.display = 'flex';
+            document.getElementById('app').style.display = 'none';
+
+            console.log('✅ Pitchfork Lite ready — Ctrl+Shift+S to toggle');
+        })();
+    </script>
+</body>
+</html>
